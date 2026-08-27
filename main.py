@@ -1,227 +1,305 @@
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import time
 
 # ==========================================
-# AKTIEN KI SCANNER
+# AKTIEN KI SCANNER – VOLATILITÄT
+# Sucht Aktien mit starken, handelbaren
+# Kursschwankungen und Momentum
 # ==========================================
 
 AKTIEN = [
-    "AAPL",
-    "MSFT",
-    "NVDA",
-    "AMZN",
-    "GOOGL",
-    "META",
-    "TSLA",
-    "AVGO",
-    "JPM",
-    "V",
+    "NVDA", "TSLA", "AMD", "MSTR", "COIN",
+    "PLTR", "NFLX", "META", "AMZN", "GOOGL",
+    "AAPL", "MSFT", "AVGO", "MU", "SMCI",
+    "JPM", "BAC", "XOM", "CVX", "CAT",
+    "BA", "UBER", "SHOP", "ORCL", "CRM",
+    "ADBE", "QCOM", "INTC", "ARM", "HOOD"
 ]
 
 
-def hole_daten(ticker_symbol):
-    """Holt Kurs- und Unternehmensdaten."""
-
+def hole_daten(symbol):
     try:
-        ticker = yf.Ticker(ticker_symbol)
+        aktie = yf.Ticker(symbol)
 
-        info = ticker.info
-        historie = ticker.history(period="6mo", auto_adjust=True)
+        df = aktie.history(
+            period="6mo",
+            interval="1d",
+            auto_adjust=True
+        )
 
-        if historie.empty:
+        if df.empty or len(df) < 30:
             return None
 
-        aktueller_kurs = historie["Close"].iloc[-1]
+        # ------------------------------------------
+        # KURSE
+        # ------------------------------------------
 
-        # Kurs vor ca. 3 Monaten
-        kurs_3m = historie["Close"].iloc[
-            max(0, len(historie) - 63)
-        ]
+        close = df["Close"]
+        high = df["High"]
+        low = df["Low"]
+        volume = df["Volume"]
 
-        # Kurs vor ca. 6 Monaten
-        kurs_6m = historie["Close"].iloc[0]
+        aktueller_kurs = float(close.iloc[-1])
 
-        performance_3m = ((aktueller_kurs / kurs_3m) - 1) * 100
-        performance_6m = ((aktueller_kurs / kurs_6m) - 1) * 100
+        # ------------------------------------------
+        # TAGESRENDITEN
+        # ------------------------------------------
+
+        renditen = close.pct_change().dropna()
+
+        volatilitaet_20 = (
+            renditen.tail(20).std() * np.sqrt(252) * 100
+        )
+
+        volatilitaet_60 = (
+            renditen.tail(60).std() * np.sqrt(252) * 100
+        )
+
+        # ------------------------------------------
+        # ATR 14
+        # ------------------------------------------
+
+        vorheriger_close = close.shift(1)
+
+        true_range = pd.concat(
+            [
+                high - low,
+                (high - vorheriger_close).abs(),
+                (low - vorheriger_close).abs()
+            ],
+            axis=1
+        ).max(axis=1)
+
+        atr_14 = true_range.rolling(14).mean().iloc[-1]
+
+        atr_prozent = (
+            float(atr_14) / aktueller_kurs * 100
+        )
+
+        # ------------------------------------------
+        # MOMENTUM
+        # ------------------------------------------
+
+        kurs_5 = float(close.iloc[-6])
+        kurs_20 = float(close.iloc[-21])
+        kurs_60 = float(close.iloc[-61])
+
+        momentum_5 = (aktueller_kurs / kurs_5 - 1) * 100
+        momentum_20 = (aktueller_kurs / kurs_20 - 1) * 100
+        momentum_60 = (aktueller_kurs / kurs_60 - 1) * 100
+
+        # ------------------------------------------
+        # HOCH / TIEF
+        # ------------------------------------------
+
+        hoch_20 = float(high.tail(20).max())
+        tief_20 = float(low.tail(20).min())
+
+        hoch_60 = float(high.tail(60).max())
+        tief_60 = float(low.tail(60).min())
+
+        abstand_hoch_20 = (
+            (hoch_20 - aktueller_kurs)
+            / aktueller_kurs
+            * 100
+        )
+
+        abstand_tief_20 = (
+            (aktueller_kurs - tief_20)
+            / aktueller_kurs
+            * 100
+        )
+
+        # ------------------------------------------
+        # VOLUMEN
+        # ------------------------------------------
+
+        durchschnitt_volumen = (
+            volume.tail(20).mean()
+        )
+
+        aktuelles_volumen = float(volume.iloc[-1])
+
+        volumen_verhaeltnis = (
+            aktuelles_volumen / durchschnitt_volumen
+            if durchschnitt_volumen > 0
+            else 0
+        )
+
+        # ------------------------------------------
+        # SCORE
+        # ------------------------------------------
+
+        score = 0
+        gruende = []
+
+        # Volatilität
+        if atr_prozent >= 5:
+            score += 30
+            gruende.append("sehr hohe tägliche Schwankung")
+        elif atr_prozent >= 3:
+            score += 24
+            gruende.append("hohe tägliche Schwankung")
+        elif atr_prozent >= 2:
+            score += 16
+            gruende.append("gute tägliche Schwankung")
+        elif atr_prozent >= 1:
+            score += 8
+
+        # 20-Tage-Volatilität
+        if volatilitaet_20 >= 50:
+            score += 20
+            gruende.append("sehr hohe kurzfristige Volatilität")
+        elif volatilitaet_20 >= 35:
+            score += 15
+            gruende.append("hohe kurzfristige Volatilität")
+        elif volatilitaet_20 >= 25:
+            score += 10
+
+        # Momentum
+        if momentum_20 >= 15:
+            score += 20
+            gruende.append("starkes 20-Tage-Momentum")
+        elif momentum_20 >= 7:
+            score += 12
+            gruende.append("positives 20-Tage-Momentum")
+        elif momentum_20 > 0:
+            score += 6
+
+        # Volumen
+        if volumen_verhaeltnis >= 1.5:
+            score += 15
+            gruende.append("deutlich erhöhtes Handelsvolumen")
+        elif volumen_verhaeltnis >= 1.1:
+            score += 8
+            gruende.append("überdurchschnittliches Handelsvolumen")
+
+        # Nähe zum 20-Tage-Hoch
+        if 0 < abstand_hoch_20 <= 5:
+            score += 15
+            gruende.append("nahe am 20-Tage-Hoch")
+        elif 5 < abstand_hoch_20 <= 10:
+            score += 8
+
+        # Zu geringe Bewegung vermeiden
+        if abs(momentum_20) < 2 and atr_prozent < 1:
+            score -= 15
+
+        score = max(0, min(100, score))
+
+        # ------------------------------------------
+        # KLASSIFIZIERUNG
+        # ------------------------------------------
+
+        if score >= 75:
+            signal = "🟢 HOHES SWING-POTENZIAL"
+        elif score >= 60:
+            signal = "🟢 INTERESSANT"
+        elif score >= 45:
+            signal = "🟡 BEOBACHTEN"
+        else:
+            signal = "🔴 WENIG POTENZIAL"
+
+        # ------------------------------------------
+        # ANALYTISCHE ATR-ZONE
+        # ------------------------------------------
+
+        atr_ziel = aktueller_kurs + float(atr_14)
 
         return {
-            "ticker": ticker_symbol,
+            "symbol": symbol,
             "kurs": aktueller_kurs,
-            "performance_3m": performance_3m,
-            "performance_6m": performance_6m,
-            "pe": info.get("trailingPE"),
-            "forward_pe": info.get("forwardPE"),
-            "profit_margin": info.get("profitMargins"),
-            "roe": info.get("returnOnEquity"),
-            "revenue_growth": info.get("revenueGrowth"),
-            "earnings_growth": info.get("earningsGrowth"),
-            "market_cap": info.get("marketCap"),
+            "score": score,
+            "signal": signal,
+            "atr": float(atr_14),
+            "atr_prozent": atr_prozent,
+            "volatilitaet_20": volatilitaet_20,
+            "momentum_5": momentum_5,
+            "momentum_20": momentum_20,
+            "momentum_60": momentum_60,
+            "hoch_20": hoch_20,
+            "tief_20": tief_20,
+            "abstand_hoch_20": abstand_hoch_20,
+            "volumen_verhaeltnis": volumen_verhaeltnis,
+            "atr_ziel": atr_ziel,
+            "gruende": gruende
         }
 
     except Exception as e:
-        print(f"Fehler bei {ticker_symbol}: {e}")
+        print(f"Fehler bei {symbol}: {e}")
         return None
 
 
-def berechne_score(daten):
-    """Berechnet einen einfachen Aktien-Score von 0 bis 100."""
-
-    score = 0
-    gruende = []
-
-    # ------------------------------------------
-    # MOMENTUM
-    # ------------------------------------------
-
-    if daten["performance_3m"] > 10:
-        score += 20
-        gruende.append("starkes 3-Monats-Momentum")
-    elif daten["performance_3m"] > 0:
-        score += 10
-        gruende.append("positives Momentum")
-
-    if daten["performance_6m"] > 15:
-        score += 15
-        gruende.append("starke 6-Monats-Performance")
-    elif daten["performance_6m"] > 0:
-        score += 7
-
-    # ------------------------------------------
-    # BEWERTUNG
-    # ------------------------------------------
-
-    pe = daten["pe"]
-
-    if pe is not None:
-        if 0 < pe < 20:
-            score += 20
-            gruende.append("vergleichsweise günstige Bewertung")
-        elif 20 <= pe < 30:
-            score += 10
-        elif pe > 60:
-            score -= 10
-            gruende.append("hohe Bewertung")
-
-    # ------------------------------------------
-    # PROFITABILITÄT
-    # ------------------------------------------
-
-    margin = daten["profit_margin"]
-
-    if margin is not None:
-        if margin > 0.20:
-            score += 15
-            gruende.append("hohe Gewinnmarge")
-        elif margin > 0.10:
-            score += 8
-
-    roe = daten["roe"]
-
-    if roe is not None:
-        if roe > 0.20:
-            score += 10
-            gruende.append("starke Eigenkapitalrendite")
-        elif roe > 0.10:
-            score += 5
-
-    # ------------------------------------------
-    # WACHSTUM
-    # ------------------------------------------
-
-    revenue_growth = daten["revenue_growth"]
-
-    if revenue_growth is not None:
-        if revenue_growth > 0.15:
-            score += 10
-            gruende.append("starkes Umsatzwachstum")
-        elif revenue_growth > 0:
-            score += 5
-
-    earnings_growth = daten["earnings_growth"]
-
-    if earnings_growth is not None:
-        if earnings_growth > 0.15:
-            score += 10
-            gruende.append("starkes Gewinnwachstum")
-        elif earnings_growth > 0:
-            score += 5
-
-    # Score begrenzen
-    score = max(0, min(score, 100))
-
-    # ------------------------------------------
-    # BEWERTUNG
-    # ------------------------------------------
-
-    if score >= 75:
-        bewertung = "🟢 SEHR INTERESSANT"
-    elif score >= 60:
-        bewertung = "🟢 INTERESSANT"
-    elif score >= 45:
-        bewertung = "🟡 BEOBACHTEN"
-    else:
-        bewertung = "🔴 SCHWACH"
-
-    return score, bewertung, gruende
-
-
 def scanner():
+
     print()
-    print("=" * 60)
-    print("       AKTIEN KI SCANNER")
-    print("=" * 60)
+    print("=" * 70)
+    print("        AKTIEN KI SCANNER – SWING / VOLATILITÄT")
+    print("=" * 70)
     print()
 
     ergebnisse = []
 
-    for aktie in AKTIEN:
+    for symbol in AKTIEN:
 
-        print(f"Analysiere {aktie} ...")
+        print(f"Analysiere {symbol} ...")
 
-        daten = hole_daten(aktie)
+        daten = hole_daten(symbol)
 
-        if daten is None:
-            continue
+        if daten:
+            ergebnisse.append(daten)
 
-        score, bewertung, gruende = berechne_score(daten)
+        time.sleep(0.5)
 
-        daten["score"] = score
-        daten["bewertung"] = bewertung
-        daten["gruende"] = gruende
-
-        ergebnisse.append(daten)
-
-        # Kleine Pause gegen zu viele Anfragen
-        time.sleep(1)
-
-    # Nach Score sortieren
     ergebnisse.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
     print()
-    print("=" * 60)
-    print("ERGEBNIS")
-    print("=" * 60)
+    print("=" * 70)
+    print("        TOP-AKTIEN MIT SCHWANKUNGSPOTENZIAL")
+    print("=" * 70)
 
-    for daten in ergebnisse:
+    for platz, daten in enumerate(
+        ergebnisse,
+        start=1
+    ):
 
         print()
-        print(f"📊 {daten['ticker']}")
-        print(f"Kurs:       ${daten['kurs']:.2f}")
-        print(f"Score:      {daten['score']}/100")
-        print(f"Bewertung:  {daten['bewertung']}")
+        print(f"#{platz} 📊 {daten['symbol']}")
+        print(f"Kurs:              ${daten['kurs']:.2f}")
+        print(f"Score:             {daten['score']}/100")
+        print(f"Signal:            {daten['signal']}")
         print(
-            f"3 Monate:   {daten['performance_3m']:.2f}%"
+            f"ATR 14:            ${daten['atr']:.2f}"
         )
         print(
-            f"6 Monate:   {daten['performance_6m']:.2f}%"
+            f"ATR:               {daten['atr_prozent']:.2f}%"
+        )
+        print(
+            f"Volatilität 20T:   "
+            f"{daten['volatilitaet_20']:.2f}%"
+        )
+        print(
+            f"Momentum 20T:      "
+            f"{daten['momentum_20']:.2f}%"
+        )
+        print(
+            f"Abstand Hoch:      "
+            f"{daten['abstand_hoch_20']:.2f}%"
+        )
+        print(
+            f"Volumen Faktor:    "
+            f"{daten['volumen_verhaeltnis']:.2f}x"
         )
 
-        if daten["pe"] is not None:
-            print(f"KGV:        {daten['pe']:.2f}")
+        print(
+            f"ATR-Orientierung:  "
+            f"${daten['atr_ziel']:.2f}"
+        )
 
         if daten["gruende"]:
             print("Gründe:")
@@ -230,9 +308,14 @@ def scanner():
                 print(f"  • {grund}")
 
     print()
-    print("=" * 60)
+    print("=" * 70)
     print("Scanner beendet.")
-    print("=" * 60)
+    print("=" * 70)
+    print()
+    print(
+        "Hinweis: Der Score ist ein Analysemodell "
+        "und keine Gewinn- oder Kaufgarantie."
+    )
 
 
 if __name__ == "__main__":
