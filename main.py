@@ -3,11 +3,12 @@ import pandas as pd
 import numpy as np
 import time
 
-# ==========================================
-# AKTIEN KI SCANNER – VOLATILITÄT
-# Sucht Aktien mit starken, handelbaren
-# Kursschwankungen und Momentum
-# ==========================================
+# ============================================================
+# AKTIEN KI SCANNER V3
+# Ziel:
+# Aktien mit starken Bewegungen finden und unterscheiden:
+# LONG / TAKE-PROFIT / ABWÄRTS / BEOBACHTEN
+# ============================================================
 
 AKTIEN = [
     "NVDA", "TSLA", "AMD", "MSTR", "COIN",
@@ -20,7 +21,9 @@ AKTIEN = [
 
 
 def hole_daten(symbol):
+
     try:
+
         aktie = yf.Ticker(symbol)
 
         df = aktie.history(
@@ -29,37 +32,26 @@ def hole_daten(symbol):
             auto_adjust=True
         )
 
-        if df.empty or len(df) < 30:
+        if df.empty or len(df) < 70:
             return None
-
-        # ------------------------------------------
-        # KURSE
-        # ------------------------------------------
 
         close = df["Close"]
         high = df["High"]
         low = df["Low"]
         volume = df["Volume"]
 
-        aktueller_kurs = float(close.iloc[-1])
+        kurs = float(close.iloc[-1])
 
-        # ------------------------------------------
-        # TAGESRENDITEN
-        # ------------------------------------------
+        # ====================================================
+        # GLEITENDE DURCHSCHNITTE
+        # ====================================================
 
-        renditen = close.pct_change().dropna()
+        sma20 = float(close.rolling(20).mean().iloc[-1])
+        sma50 = float(close.rolling(50).mean().iloc[-1])
 
-        volatilitaet_20 = (
-            renditen.tail(20).std() * np.sqrt(252) * 100
-        )
-
-        volatilitaet_60 = (
-            renditen.tail(60).std() * np.sqrt(252) * 100
-        )
-
-        # ------------------------------------------
+        # ====================================================
         # ATR 14
-        # ------------------------------------------
+        # ====================================================
 
         vorheriger_close = close.shift(1)
 
@@ -72,179 +64,333 @@ def hole_daten(symbol):
             axis=1
         ).max(axis=1)
 
-        atr_14 = true_range.rolling(14).mean().iloc[-1]
+        atr14 = float(
+            true_range.rolling(14).mean().iloc[-1]
+        )
 
         atr_prozent = (
-            float(atr_14) / aktueller_kurs * 100
+            atr14 / kurs * 100
         )
 
-        # ------------------------------------------
+        # ====================================================
         # MOMENTUM
-        # ------------------------------------------
+        # ====================================================
 
-        kurs_5 = float(close.iloc[-6])
-        kurs_20 = float(close.iloc[-21])
-        kurs_60 = float(close.iloc[-61])
+        momentum5 = (
+            (kurs / float(close.iloc[-6])) - 1
+        ) * 100
 
-        momentum_5 = (aktueller_kurs / kurs_5 - 1) * 100
-        momentum_20 = (aktueller_kurs / kurs_20 - 1) * 100
-        momentum_60 = (aktueller_kurs / kurs_60 - 1) * 100
+        momentum20 = (
+            (kurs / float(close.iloc[-21])) - 1
+        ) * 100
 
-        # ------------------------------------------
+        momentum60 = (
+            (kurs / float(close.iloc[-61])) - 1
+        ) * 100
+
+        # ====================================================
+        # VOLATILITÄT
+        # ====================================================
+
+        renditen = close.pct_change().dropna()
+
+        volatilitaet20 = (
+            renditen.tail(20).std()
+            * np.sqrt(252)
+            * 100
+        )
+
+        # ====================================================
         # HOCH / TIEF
-        # ------------------------------------------
+        # ====================================================
 
-        hoch_20 = float(high.tail(20).max())
-        tief_20 = float(low.tail(20).min())
+        hoch20 = float(
+            high.tail(20).max()
+        )
 
-        hoch_60 = float(high.tail(60).max())
-        tief_60 = float(low.tail(60).min())
+        tief20 = float(
+            low.tail(20).min()
+        )
 
-        abstand_hoch_20 = (
-            (hoch_20 - aktueller_kurs)
-            / aktueller_kurs
+        abstand_hoch = (
+            (hoch20 - kurs)
+            / kurs
             * 100
         )
 
-        abstand_tief_20 = (
-            (aktueller_kurs - tief_20)
-            / aktueller_kurs
+        abstand_tief = (
+            (kurs - tief20)
+            / kurs
             * 100
         )
 
-        # ------------------------------------------
+        # ====================================================
         # VOLUMEN
-        # ------------------------------------------
+        # ====================================================
 
-        durchschnitt_volumen = (
+        volumen20 = float(
             volume.tail(20).mean()
         )
 
-        aktuelles_volumen = float(volume.iloc[-1])
+        volumen_aktuell = float(
+            volume.iloc[-1]
+        )
 
-        volumen_verhaeltnis = (
-            aktuelles_volumen / durchschnitt_volumen
-            if durchschnitt_volumen > 0
+        volumen_faktor = (
+            volumen_aktuell / volumen20
+            if volumen20 > 0
             else 0
         )
 
-        # ------------------------------------------
+        # ====================================================
+        # TREND
+        # ====================================================
+
+        trend_aufwaerts = (
+            kurs > sma20 and
+            sma20 > sma50
+        )
+
+        trend_abwaerts = (
+            kurs < sma20 and
+            sma20 < sma50
+        )
+
+        # ====================================================
         # SCORE
-        # ------------------------------------------
+        # ====================================================
 
-        score = 0
-        gruende = []
+        long_score = 0
+        short_score = 0
 
-        # Volatilität
-        if atr_prozent >= 5:
-            score += 30
-            gruende.append("sehr hohe tägliche Schwankung")
-        elif atr_prozent >= 3:
-            score += 24
-            gruende.append("hohe tägliche Schwankung")
+        gruende_long = []
+        gruende_short = []
+
+        # ----------------------------------------------------
+        # LONG
+        # ----------------------------------------------------
+
+        if trend_aufwaerts:
+            long_score += 25
+            gruende_long.append(
+                "Aufwärtstrend über SMA20/SMA50"
+            )
+
+        if momentum20 >= 15:
+            long_score += 25
+            gruende_long.append(
+                "starkes 20-Tage-Momentum"
+            )
+
+        elif momentum20 >= 5:
+            long_score += 15
+            gruende_long.append(
+                "positives 20-Tage-Momentum"
+            )
+
+        if volumen_faktor >= 1.5:
+            long_score += 20
+            gruende_long.append(
+                "stark erhöhtes Volumen"
+            )
+
+        elif volumen_faktor >= 1.1:
+            long_score += 10
+            gruende_long.append(
+                "überdurchschnittliches Volumen"
+            )
+
+        if atr_prozent >= 3:
+            long_score += 15
+            gruende_long.append(
+                "hohe handelbare Schwankung"
+            )
+
         elif atr_prozent >= 2:
-            score += 16
-            gruende.append("gute tägliche Schwankung")
-        elif atr_prozent >= 1:
-            score += 8
+            long_score += 8
 
-        # 20-Tage-Volatilität
-        if volatilitaet_20 >= 50:
-            score += 20
-            gruende.append("sehr hohe kurzfristige Volatilität")
-        elif volatilitaet_20 >= 35:
-            score += 15
-            gruende.append("hohe kurzfristige Volatilität")
-        elif volatilitaet_20 >= 25:
-            score += 10
+        # ----------------------------------------------------
+        # SHORT / ABWÄRTS
+        # ----------------------------------------------------
 
-        # Momentum
-        if momentum_20 >= 15:
-            score += 20
-            gruende.append("starkes 20-Tage-Momentum")
-        elif momentum_20 >= 7:
-            score += 12
-            gruende.append("positives 20-Tage-Momentum")
-        elif momentum_20 > 0:
-            score += 6
+        if trend_abwaerts:
+            short_score += 25
+            gruende_short.append(
+                "Abwärtstrend unter SMA20/SMA50"
+            )
 
-        # Volumen
-        if volumen_verhaeltnis >= 1.5:
-            score += 15
-            gruende.append("deutlich erhöhtes Handelsvolumen")
-        elif volumen_verhaeltnis >= 1.1:
-            score += 8
-            gruende.append("überdurchschnittliches Handelsvolumen")
+        if momentum20 <= -15:
+            short_score += 25
+            gruende_short.append(
+                "stark negatives 20-Tage-Momentum"
+            )
 
-        # Nähe zum 20-Tage-Hoch
-        if 0 < abstand_hoch_20 <= 5:
-            score += 15
-            gruende.append("nahe am 20-Tage-Hoch")
-        elif 5 < abstand_hoch_20 <= 10:
-            score += 8
+        elif momentum20 <= -5:
+            short_score += 15
+            gruende_short.append(
+                "negatives 20-Tage-Momentum"
+            )
 
-        # Zu geringe Bewegung vermeiden
-        if abs(momentum_20) < 2 and atr_prozent < 1:
-            score -= 15
+        if volumen_faktor >= 1.5:
+            short_score += 20
+            gruende_short.append(
+                "stark erhöhtes Volumen"
+            )
 
-        score = max(0, min(100, score))
+        elif volumen_faktor >= 1.1:
+            short_score += 10
 
-        # ------------------------------------------
-        # KLASSIFIZIERUNG
-        # ------------------------------------------
+        if atr_prozent >= 3:
+            short_score += 15
+            gruende_short.append(
+                "hohe handelbare Schwankung"
+            )
 
-        if score >= 75:
-            signal = "🟢 HOHES SWING-POTENZIAL"
-        elif score >= 60:
-            signal = "🟢 INTERESSANT"
-        elif score >= 45:
-            signal = "🟡 BEOBACHTEN"
+        # ====================================================
+        # TAKE-PROFIT
+        # ====================================================
+
+        take_profit_score = 0
+        gruende_tp = []
+
+        if trend_aufwaerts:
+            take_profit_score += 20
+            gruende_tp.append(
+                "Aufwärtstrend"
+            )
+
+        if momentum20 >= 15:
+            take_profit_score += 25
+            gruende_tp.append(
+                "starke Kursbewegung"
+            )
+
+        if abstand_hoch <= 3:
+            take_profit_score += 30
+            gruende_tp.append(
+                "sehr nahe am 20-Tage-Hoch"
+            )
+
+        elif abstand_hoch <= 5:
+            take_profit_score += 20
+            gruende_tp.append(
+                "nahe am 20-Tage-Hoch"
+            )
+
+        if volatilitaet20 >= 40:
+            take_profit_score += 15
+            gruende_tp.append(
+                "hohe kurzfristige Volatilität"
+            )
+
+        if volumen_faktor >= 1.5:
+            take_profit_score += 10
+            gruende_tp.append(
+                "erhöhtes Volumen"
+            )
+
+        take_profit_score = min(
+            take_profit_score,
+            100
+        )
+
+        # ====================================================
+        # BESTES SIGNAL
+        # ====================================================
+
+        if take_profit_score >= 70:
+
+            signal = "🟡 TAKE-PROFIT-KANDIDAT"
+            score = take_profit_score
+            gruende = gruende_tp
+
+        elif long_score >= 65:
+
+            signal = "🟢 LONG-KANDIDAT"
+            score = long_score
+            gruende = gruende_long
+
+        elif short_score >= 65:
+
+            signal = "🔴 ABWÄRTS-KANDIDAT"
+            score = short_score
+            gruende = gruende_short
+
         else:
-            signal = "🔴 WENIG POTENZIAL"
 
-        # ------------------------------------------
-        # ANALYTISCHE ATR-ZONE
-        # ------------------------------------------
+            signal = "⚪ BEOBACHTEN"
+            score = max(
+                long_score,
+                short_score,
+                take_profit_score
+            )
+            gruende = []
 
-        atr_ziel = aktueller_kurs + float(atr_14)
+        # ====================================================
+        # ATR ORIENTIERUNG
+        # ====================================================
+
+        atr_oben = kurs + atr14
+        atr_unten = kurs - atr14
 
         return {
+
             "symbol": symbol,
-            "kurs": aktueller_kurs,
+            "kurs": kurs,
+
             "score": score,
             "signal": signal,
-            "atr": float(atr_14),
+
+            "sma20": sma20,
+            "sma50": sma50,
+
+            "atr": atr14,
             "atr_prozent": atr_prozent,
-            "volatilitaet_20": volatilitaet_20,
-            "momentum_5": momentum_5,
-            "momentum_20": momentum_20,
-            "momentum_60": momentum_60,
-            "hoch_20": hoch_20,
-            "tief_20": tief_20,
-            "abstand_hoch_20": abstand_hoch_20,
-            "volumen_verhaeltnis": volumen_verhaeltnis,
-            "atr_ziel": atr_ziel,
+
+            "volatilitaet20": volatilitaet20,
+
+            "momentum5": momentum5,
+            "momentum20": momentum20,
+            "momentum60": momentum60,
+
+            "hoch20": hoch20,
+            "tief20": tief20,
+
+            "abstand_hoch": abstand_hoch,
+
+            "volumen_faktor": volumen_faktor,
+
+            "atr_oben": atr_oben,
+            "atr_unten": atr_unten,
+
             "gruende": gruende
         }
 
     except Exception as e:
-        print(f"Fehler bei {symbol}: {e}")
+
+        print(
+            f"Fehler bei {symbol}: {e}"
+        )
+
         return None
 
 
 def scanner():
 
     print()
-    print("=" * 70)
-    print("        AKTIEN KI SCANNER – SWING / VOLATILITÄT")
-    print("=" * 70)
+    print("=" * 75)
+    print("       AKTIEN KI SCANNER V3")
+    print("       SWING / VOLATILITÄT / SIGNAL")
+    print("=" * 75)
     print()
 
     ergebnisse = []
 
     for symbol in AKTIEN:
 
-        print(f"Analysiere {symbol} ...")
+        print(
+            f"Analysiere {symbol} ..."
+        )
 
         daten = hole_daten(symbol)
 
@@ -253,15 +399,23 @@ def scanner():
 
         time.sleep(0.5)
 
+    # ========================================================
+    # SORTIEREN
+    # ========================================================
+
     ergebnisse.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
+    # ========================================================
+    # AUSGABE
+    # ========================================================
+
     print()
-    print("=" * 70)
-    print("        TOP-AKTIEN MIT SCHWANKUNGSPOTENZIAL")
-    print("=" * 70)
+    print("=" * 75)
+    print("             TOP SWING-SIGNALE")
+    print("=" * 75)
 
     for platz, daten in enumerate(
         ergebnisse,
@@ -269,52 +423,94 @@ def scanner():
     ):
 
         print()
-        print(f"#{platz} 📊 {daten['symbol']}")
-        print(f"Kurs:              ${daten['kurs']:.2f}")
-        print(f"Score:             {daten['score']}/100")
-        print(f"Signal:            {daten['signal']}")
         print(
-            f"ATR 14:            ${daten['atr']:.2f}"
-        )
-        print(
-            f"ATR:               {daten['atr_prozent']:.2f}%"
-        )
-        print(
-            f"Volatilität 20T:   "
-            f"{daten['volatilitaet_20']:.2f}%"
-        )
-        print(
-            f"Momentum 20T:      "
-            f"{daten['momentum_20']:.2f}%"
-        )
-        print(
-            f"Abstand Hoch:      "
-            f"{daten['abstand_hoch_20']:.2f}%"
-        )
-        print(
-            f"Volumen Faktor:    "
-            f"{daten['volumen_verhaeltnis']:.2f}x"
+            f"#{platz} 📊 {daten['symbol']}"
         )
 
         print(
-            f"ATR-Orientierung:  "
-            f"${daten['atr_ziel']:.2f}"
+            f"Kurs:              "
+            f"${daten['kurs']:.2f}"
+        )
+
+        print(
+            f"Score:             "
+            f"{daten['score']}/100"
+        )
+
+        print(
+            f"Signal:            "
+            f"{daten['signal']}"
+        )
+
+        print(
+            f"ATR 14:            "
+            f"${daten['atr']:.2f}"
+        )
+
+        print(
+            f"ATR:               "
+            f"{daten['atr_prozent']:.2f}%"
+        )
+
+        print(
+            f"Volatilität 20T:   "
+            f"{daten['volatilitaet20']:.2f}%"
+        )
+
+        print(
+            f"Momentum 5T:       "
+            f"{daten['momentum5']:.2f}%"
+        )
+
+        print(
+            f"Momentum 20T:      "
+            f"{daten['momentum20']:.2f}%"
+        )
+
+        print(
+            f"Momentum 60T:      "
+            f"{daten['momentum60']:.2f}%"
+        )
+
+        print(
+            f"Abstand Hoch:      "
+            f"{daten['abstand_hoch']:.2f}%"
+        )
+
+        print(
+            f"Volumen Faktor:    "
+            f"{daten['volumen_faktor']:.2f}x"
+        )
+
+        print(
+            f"ATR oben:          "
+            f"${daten['atr_oben']:.2f}"
+        )
+
+        print(
+            f"ATR unten:         "
+            f"${daten['atr_unten']:.2f}"
         )
 
         if daten["gruende"]:
+
             print("Gründe:")
 
             for grund in daten["gruende"]:
-                print(f"  • {grund}")
+
+                print(
+                    f"  • {grund}"
+                )
 
     print()
-    print("=" * 70)
+    print("=" * 75)
     print("Scanner beendet.")
-    print("=" * 70)
+    print("=" * 75)
     print()
     print(
-        "Hinweis: Der Score ist ein Analysemodell "
-        "und keine Gewinn- oder Kaufgarantie."
+        "Hinweis: Die Signale sind "
+        "technische Analyse und keine "
+        "Garantie für Gewinne."
     )
 
 
