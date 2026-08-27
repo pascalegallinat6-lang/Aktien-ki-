@@ -4,191 +4,77 @@ import numpy as np
 from datetime import datetime
 
 # ============================================================
-# AKTIEN KI SCANNER V5
-# LONG / SHORT / TAKE PROFIT
+# AKTIEN TRADING SCANNER V6
+# ============================================================
+
+AKTIEN = [
+    # Technologie
+    "NVDA", "AMD", "AVGO", "MU", "INTC", "QCOM",
+    "ARM", "SMCI", "AAPL", "MSFT", "ORCL", "CRM",
+    "ADBE", "PLTR", "META", "GOOGL", "AMZN", "NFLX",
+
+    # Trading / Wachstum
+    "TSLA", "MSTR", "COIN", "HOOD", "UBER", "SHOP",
+    "SNOW", "CRWD", "PANW", "NET", "DDOG", "RBLX",
+
+    # Finanzen
+    "JPM", "BAC", "GS", "MS", "V", "MA", "PYPL",
+
+    # Industrie / Energie
+    "BA", "CAT", "GE", "XOM", "CVX", "COP",
+
+    # Konsum
+    "WMT", "COST", "NKE", "SBUX", "MCD",
+
+    # Weitere liquide Aktien
+    "DIS", "PFE", "MRK", "LLY", "TMO", "ABNB",
+    "DASH", "SQ", "ROKU", "SOFI", "DKNG",
+    "CVNA", "GME", "AMC"
+]
+
+
+# ============================================================
+# WKN / ISIN DER WICHTIGSTEN AKTIEN
 # ============================================================
 
 WERTPAPIERE = {
 
-    "NVDA": {
-        "name": "NVIDIA",
-        "wkn": "918422",
-        "isin": "US67066G1040"
-    },
+    "NVDA": ("918422", "US67066G1040"),
+    "AMD": ("863186", "US0079031078"),
+    "AAPL": ("865985", "US0378331005"),
+    "MSFT": ("870747", "US5949181045"),
+    "AMZN": ("906866", "US0231351067"),
+    "GOOGL": ("A14Y6F", "US02079K3059"),
+    "META": ("A1JWVX", "US30303M1027"),
 
-    "TSLA": {
-        "name": "Tesla",
-        "wkn": "A1CX3T",
-        "isin": "US88160R1014"
-    },
+    "TSLA": ("A1CX3T", "US88160R1014"),
+    "MSTR": ("A0J3ER", "US5949724083"),
+    "COIN": ("A2QP7J", "US19260Q1076"),
+    "PLTR": ("A2QA4J", "US69608A1088"),
+    "NFLX": ("552484", "US64110L1061"),
 
-    "AMD": {
-        "name": "AMD",
-        "wkn": "863186",
-        "isin": "US0079031078"
-    },
+    "AVGO": ("A2JG9Z", "US11135F1012"),
+    "MU": ("869020", "US5951121038"),
+    "INTC": ("855681", "US4581401001"),
+    "QCOM": ("883121", "US7475251036"),
+    "SMCI": ("A40MRM", "US86800U3023"),
+    "ORCL": ("871460", "US68389X1054"),
+    "CRM": ("A0B87V", "US79466L3024"),
+    "ADBE": ("871981", "US00724F1012"),
 
-    "MSTR": {
-        "name": "Strategy",
-        "wkn": "A0J3ER",
-        "isin": "US5949724083"
-    },
+    "JPM": ("850628", "US46647P1049"),
+    "BAC": ("858388", "US0605051046"),
+    "V": ("A0NC7B", "US92826C8394"),
+    "MA": ("A0F602", "US57636Q1040"),
 
-    "COIN": {
-        "name": "Coinbase",
-        "wkn": "A2QP7J",
-        "isin": "US19260Q1076"
-    },
+    "UBER": ("A2PHHG", "US90353T1007"),
+    "SHOP": ("A14TJP", "CA82509L1076"),
 
-    "PLTR": {
-        "name": "Palantir",
-        "wkn": "A2QA4J",
-        "isin": "US69608A1088"
-    },
+    "XOM": ("852549", "US30231G1022"),
+    "CVX": ("852552", "US1667641005"),
 
-    "NFLX": {
-        "name": "Netflix",
-        "wkn": "552484",
-        "isin": "US64110L1061"
-    },
-
-    "META": {
-        "name": "Meta Platforms",
-        "wkn": "A1JWVX",
-        "isin": "US30303M1027"
-    },
-
-    "AMZN": {
-        "name": "Amazon",
-        "wkn": "906866",
-        "isin": "US0231351067"
-    },
-
-    "GOOGL": {
-        "name": "Alphabet A",
-        "wkn": "A14Y6F",
-        "isin": "US02079K3059"
-    },
-
-    "AAPL": {
-        "name": "Apple",
-        "wkn": "865985",
-        "isin": "US0378331005"
-    },
-
-    "MSFT": {
-        "name": "Microsoft",
-        "wkn": "870747",
-        "isin": "US5949181045"
-    },
-
-    "AVGO": {
-        "name": "Broadcom",
-        "wkn": "A2JG9Z",
-        "isin": "US11135F1012"
-    },
-
-    "MU": {
-        "name": "Micron",
-        "wkn": "869020",
-        "isin": "US5951121038"
-    },
-
-    "SMCI": {
-        "name": "Super Micro Computer",
-        "wkn": "A40MRM",
-        "isin": "US86800U3023"
-    },
-
-    "JPM": {
-        "name": "JPMorgan",
-        "wkn": "850628",
-        "isin": "US46647P1049"
-    },
-
-    "BAC": {
-        "name": "Bank of America",
-        "wkn": "858388",
-        "isin": "US0605051046"
-    },
-
-    "XOM": {
-        "name": "Exxon Mobil",
-        "wkn": "852549",
-        "isin": "US30231G1022"
-    },
-
-    "CVX": {
-        "name": "Chevron",
-        "wkn": "852552",
-        "isin": "US1667641005"
-    },
-
-    "CAT": {
-        "name": "Caterpillar",
-        "wkn": "850598",
-        "isin": "US1491231015"
-    },
-
-    "BA": {
-        "name": "Boeing",
-        "wkn": "850471",
-        "isin": "US0970231058"
-    },
-
-    "UBER": {
-        "name": "Uber",
-        "wkn": "A2PHHG",
-        "isin": "US90353T1007"
-    },
-
-    "SHOP": {
-        "name": "Shopify",
-        "wkn": "A14TJP",
-        "isin": "CA82509L1076"
-    },
-
-    "ORCL": {
-        "name": "Oracle",
-        "wkn": "871460",
-        "isin": "US68389X1054"
-    },
-
-    "CRM": {
-        "name": "Salesforce",
-        "wkn": "A0B87V",
-        "isin": "US79466L3024"
-    },
-
-    "ADBE": {
-        "name": "Adobe",
-        "wkn": "871981",
-        "isin": "US00724F1012"
-    },
-
-    "QCOM": {
-        "name": "Qualcomm",
-        "wkn": "883121",
-        "isin": "US7475251036"
-    },
-
-    "INTC": {
-        "name": "Intel",
-        "wkn": "855681",
-        "isin": "US4581401001"
-    },
-
-    "ARM": {
-        "name": "Arm Holdings",
-        "wkn": "A3EUCD",
-        "isin": "US0420682058"
-    },
-
-    "HOOD": {
-        "name": "Robinhood",
-        "wkn": "A3CVQC",
-        "isin": "US7707001027"
-    }
+    "BA": ("850471", "US0970231058"),
+    "CAT": ("850598", "US1491231015")
 }
 
 
@@ -197,9 +83,11 @@ WERTPAPIERE = {
 # ============================================================
 
 PERIODE = "6mo"
+TOP_AKTIEN = 10
 
-MIN_ATR = 2.0
-MIN_VOLATILITAET = 25.0
+MIN_ATR_PROZENT = 1.5
+MIN_VOLATILITAET = 20
+
 
 # ============================================================
 # KURSDATEN
@@ -217,7 +105,10 @@ def hole_daten(ticker):
             auto_adjust=True
         )
 
-        if df.empty or len(df) < 70:
+        if df.empty:
+            return None
+
+        if len(df) < 70:
             return None
 
         return df.dropna()
@@ -244,9 +135,9 @@ def analysiere(ticker, df):
 
     kurs = float(close.iloc[-1])
 
-    # --------------------------------------------------------
+    # ========================================================
     # SMA
-    # --------------------------------------------------------
+    # ========================================================
 
     sma20 = float(
         close.rolling(20).mean().iloc[-1]
@@ -256,9 +147,9 @@ def analysiere(ticker, df):
         close.rolling(50).mean().iloc[-1]
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # ATR
-    # --------------------------------------------------------
+    # ========================================================
 
     previous_close = close.shift(1)
 
@@ -279,9 +170,9 @@ def analysiere(ticker, df):
         atr / kurs
     ) * 100
 
-    # --------------------------------------------------------
+    # ========================================================
     # MOMENTUM
-    # --------------------------------------------------------
+    # ========================================================
 
     momentum5 = (
         kurs / float(close.iloc[-6]) - 1
@@ -295,9 +186,9 @@ def analysiere(ticker, df):
         kurs / float(close.iloc[-61]) - 1
     ) * 100
 
-    # --------------------------------------------------------
+    # ========================================================
     # VOLATILITÄT
-    # --------------------------------------------------------
+    # ========================================================
 
     renditen = close.pct_change()
 
@@ -307,26 +198,9 @@ def analysiere(ticker, df):
         * 100
     )
 
-    # --------------------------------------------------------
-    # HOCH / TIEF
-    # --------------------------------------------------------
-
-    hoch20 = float(
-        high.tail(20).max()
-    )
-
-    tief20 = float(
-        low.tail(20).min()
-    )
-
-    abstand_hoch = (
-        (hoch20 - kurs)
-        / hoch20
-    ) * 100
-
-    # --------------------------------------------------------
+    # ========================================================
     # VOLUMEN
-    # --------------------------------------------------------
+    # ========================================================
 
     durchschnitt_volumen = float(
         volume.tail(20).mean()
@@ -344,6 +218,42 @@ def analysiere(ticker, df):
         volumen_faktor = 0
 
     # ========================================================
+    # HOCH / TIEF
+    # ========================================================
+
+    hoch20 = float(
+        high.tail(20).max()
+    )
+
+    tief20 = float(
+        low.tail(20).min()
+    )
+
+    abstand_hoch = (
+        (hoch20 - kurs)
+        / hoch20
+    ) * 100
+
+    abstand_tief = (
+        (kurs - tief20)
+        / tief20
+    ) * 100
+
+    # ========================================================
+    # TREND
+    # ========================================================
+
+    trend_long = (
+        kurs > sma20
+        and sma20 > sma50
+    )
+
+    trend_short = (
+        kurs < sma20
+        and sma20 < sma50
+    )
+
+    # ========================================================
     # LONG SCORE
     # ========================================================
 
@@ -352,7 +262,7 @@ def analysiere(ticker, df):
 
     if kurs > sma20:
 
-        long_score += 20
+        long_score += 15
 
         long_gruende.append(
             "Kurs über SMA20"
@@ -371,7 +281,7 @@ def analysiere(ticker, df):
         long_score += 10
 
         long_gruende.append(
-            "positives kurzfristiges Momentum"
+            "positives 5-Tage-Momentum"
         )
 
     if momentum20 > 5:
@@ -390,20 +300,20 @@ def analysiere(ticker, df):
             "positives 60-Tage-Momentum"
         )
 
-    if volumen_faktor > 1.2:
+    if volumen_faktor >= 1.2:
 
         long_score += 10
 
         long_gruende.append(
-            "überdurchschnittliches Volumen"
+            "erhöhtes Volumen"
         )
 
-    if atr_prozent >= MIN_ATR:
+    if atr_prozent >= MIN_ATR_PROZENT:
 
         long_score += 10
 
         long_gruende.append(
-            "ausreichende Schwankungsbreite"
+            "gute Schwankungsbreite"
         )
 
     long_score = min(
@@ -420,7 +330,7 @@ def analysiere(ticker, df):
 
     if kurs < sma20:
 
-        short_score += 20
+        short_score += 15
 
         short_gruende.append(
             "Kurs unter SMA20"
@@ -439,7 +349,7 @@ def analysiere(ticker, df):
         short_score += 10
 
         short_gruende.append(
-            "negatives kurzfristiges Momentum"
+            "negatives 5-Tage-Momentum"
         )
 
     if momentum20 < -5:
@@ -458,20 +368,20 @@ def analysiere(ticker, df):
             "negatives 60-Tage-Momentum"
         )
 
-    if volumen_faktor > 1.2:
+    if volumen_faktor >= 1.2:
 
         short_score += 10
 
         short_gruende.append(
-            "überdurchschnittliches Volumen"
+            "erhöhtes Volumen"
         )
 
-    if atr_prozent >= MIN_ATR:
+    if atr_prozent >= MIN_ATR_PROZENT:
 
         short_score += 10
 
         short_gruende.append(
-            "ausreichende Schwankungsbreite"
+            "gute Schwankungsbreite"
         )
 
     short_score = min(
@@ -484,13 +394,13 @@ def analysiere(ticker, df):
     # ========================================================
 
     take_profit_score = 0
-    take_profit_gruende = []
+    tp_gruende = []
 
     if momentum20 > 10:
 
         take_profit_score += 25
 
-        take_profit_gruende.append(
+        tp_gruende.append(
             "starkes 20-Tage-Momentum"
         )
 
@@ -498,7 +408,7 @@ def analysiere(ticker, df):
 
         take_profit_score += 20
 
-        take_profit_gruende.append(
+        tp_gruende.append(
             "starke kurzfristige Bewegung"
         )
 
@@ -506,7 +416,7 @@ def analysiere(ticker, df):
 
         take_profit_score += 30
 
-        take_profit_gruende.append(
+        tp_gruende.append(
             "sehr nahe am 20-Tage-Hoch"
         )
 
@@ -514,7 +424,7 @@ def analysiere(ticker, df):
 
         take_profit_score += 20
 
-        take_profit_gruende.append(
+        tp_gruende.append(
             "nahe am 20-Tage-Hoch"
         )
 
@@ -522,7 +432,7 @@ def analysiere(ticker, df):
 
         take_profit_score += 15
 
-        take_profit_gruende.append(
+        tp_gruende.append(
             "hohe Schwankungsbreite"
         )
 
@@ -530,7 +440,7 @@ def analysiere(ticker, df):
 
         take_profit_score += 10
 
-        take_profit_gruende.append(
+        tp_gruende.append(
             "stark erhöhtes Volumen"
         )
 
@@ -540,7 +450,7 @@ def analysiere(ticker, df):
     )
 
     # ========================================================
-    # SIGNAL BESTIMMEN
+    # SIGNAL
     # ========================================================
 
     if take_profit_score >= 70:
@@ -549,9 +459,17 @@ def analysiere(ticker, df):
 
         score = take_profit_score
 
-        gruende = take_profit_gruende
+        gruende = tp_gruende
 
-    elif long_score >= 65:
+    elif long_score >= 75:
+
+        signal = "🟢 STARKER LONG"
+
+        score = long_score
+
+        gruende = long_gruende
+
+    elif long_score >= 60:
 
         signal = "🟢 LONG"
 
@@ -559,7 +477,15 @@ def analysiere(ticker, df):
 
         gruende = long_gruende
 
-    elif short_score >= 65:
+    elif short_score >= 75:
+
+        signal = "🔴 STARKER SHORT"
+
+        score = short_score
+
+        gruende = short_gruende
+
+    elif short_score >= 60:
 
         signal = "🔴 SHORT"
 
@@ -583,83 +509,81 @@ def analysiere(ticker, df):
     # TECHNISCHE ZONEN
     # ========================================================
 
-    if signal == "🟢 LONG":
+    if signal in [
+        "🟢 LONG",
+        "🟢 STARKER LONG"
+    ]:
 
-        einstieg_unten = kurs - (
-            atr * 0.50
+        einstieg = kurs
+
+        stop_loss = (
+            kurs - atr * 1.2
         )
 
-        einstieg_oben = kurs + (
-            atr * 0.20
+        ziel1 = (
+            kurs + atr
         )
 
-        stop_loss = kurs - (
-            atr * 1.20
+        ziel2 = (
+            kurs + atr * 2
         )
 
-        ziel1 = kurs + (
-            atr * 1.00
+    elif signal in [
+        "🔴 SHORT",
+        "🔴 STARKER SHORT"
+    ]:
+
+        einstieg = kurs
+
+        stop_loss = (
+            kurs + atr * 1.2
         )
 
-        ziel2 = kurs + (
-            atr * 2.00
+        ziel1 = (
+            kurs - atr
         )
 
-    elif signal == "🔴 SHORT":
-
-        einstieg_unten = kurs - (
-            atr * 0.20
-        )
-
-        einstieg_oben = kurs + (
-            atr * 0.50
-        )
-
-        stop_loss = kurs + (
-            atr * 1.20
-        )
-
-        ziel1 = kurs - (
-            atr * 1.00
-        )
-
-        ziel2 = kurs - (
-            atr * 2.00
+        ziel2 = (
+            kurs - atr * 2
         )
 
     else:
 
-        einstieg_unten = kurs - (
-            atr * 0.50
+        einstieg = kurs
+
+        stop_loss = (
+            kurs - atr
         )
 
-        einstieg_oben = kurs + (
-            atr * 0.50
+        ziel1 = (
+            kurs + atr
         )
 
-        stop_loss = kurs - atr
-
-        ziel1 = kurs + atr
-
-        ziel2 = kurs + (
-            atr * 2
+        ziel2 = (
+            kurs + atr * 2
         )
 
     # ========================================================
     # WKN / ISIN
     # ========================================================
 
-    info = WERTPAPIERE[ticker]
+    if ticker in WERTPAPIERE:
+
+        wkn = WERTPAPIERE[ticker][0]
+        isin = WERTPAPIERE[ticker][1]
+
+    else:
+
+        wkn = "nicht hinterlegt"
+        isin = "nicht hinterlegt"
 
     return {
 
         "ticker": ticker,
 
-        "name": info["name"],
+        "wkn": wkn,
 
-        "wkn": info["wkn"],
-
-        "isin": info["isin"],
+        "isin": isin,
 
         "kurs": kurs,
 
@@ -693,11 +617,8 @@ def analysiere(ticker, df):
         "abstand_hoch":
             abstand_hoch,
 
-        "einstieg_unten":
-            einstieg_unten,
-
-        "einstieg_oben":
-            einstieg_oben,
+        "einstieg":
+            einstieg,
 
         "stop_loss":
             stop_loss,
@@ -717,129 +638,116 @@ def analysiere(ticker, df):
 # AUSGABE
 # ============================================================
 
-def zeige(ergebnis, nummer):
+def ausgabe(x, nummer):
 
     print()
-    print("=" * 65)
+    print("=" * 70)
 
     print(
-        f"#{nummer}  "
-        f"{ergebnis['ticker']} – "
-        f"{ergebnis['name']}"
+        f"#{nummer}  📊 {x['ticker']}"
     )
 
-    print("-" * 65)
+    print("-" * 70)
 
     print(
-        f"WKN:              "
-        f"{ergebnis['wkn']}"
+        f"WKN:              {x['wkn']}"
     )
 
     print(
-        f"ISIN:             "
-        f"{ergebnis['isin']}"
+        f"ISIN:             {x['isin']}"
     )
 
     print(
-        f"Kurs:             "
-        f"${ergebnis['kurs']:.2f}"
+        f"Kurs:             ${x['kurs']:.2f}"
     )
 
     print(
-        f"Signal:           "
-        f"{ergebnis['signal']}"
+        f"Signal:           {x['signal']}"
     )
 
     print(
-        f"Score:            "
-        f"{ergebnis['score']}/100"
+        f"Score:            {x['score']}/100"
     )
 
     print(
-        f"LONG Score:       "
-        f"{ergebnis['long_score']}/100"
+        f"LONG Score:       {x['long_score']}/100"
     )
 
     print(
-        f"SHORT Score:      "
-        f"{ergebnis['short_score']}/100"
+        f"SHORT Score:      {x['short_score']}/100"
     )
 
     print()
 
     print(
-        f"ATR:              "
-        f"${ergebnis['atr']:.2f}"
+        f"ATR:              ${x['atr']:.2f}"
     )
 
     print(
-        f"ATR %:            "
-        f"{ergebnis['atr_prozent']:.2f}%"
+        f"ATR %:            {x['atr_prozent']:.2f}%"
     )
 
     print(
         f"Volatilität 20T:  "
-        f"{ergebnis['volatilitaet20']:.2f}%"
+        f"{x['volatilitaet20']:.2f}%"
     )
 
     print(
         f"Momentum 5T:      "
-        f"{ergebnis['momentum5']:.2f}%"
+        f"{x['momentum5']:+.2f}%"
     )
 
     print(
         f"Momentum 20T:     "
-        f"{ergebnis['momentum20']:.2f}%"
+        f"{x['momentum20']:+.2f}%"
     )
 
     print(
         f"Momentum 60T:     "
-        f"{ergebnis['momentum60']:.2f}%"
+        f"{x['momentum60']:+.2f}%"
     )
 
     print(
         f"Volumen:          "
-        f"{ergebnis['volumen_faktor']:.2f}x"
+        f"{x['volumen_faktor']:.2f}x"
     )
 
     print(
         f"Abstand Hoch:     "
-        f"{ergebnis['abstand_hoch']:.2f}%"
+        f"{x['abstand_hoch']:.2f}%"
     )
 
     print()
 
-    print("TECHNISCHE ZONEN")
+    print("TRADING-ZONEN")
 
     print(
         f"Einstieg:         "
-        f"${ergebnis['einstieg_unten']:.2f}"
-        f" – "
-        f"${ergebnis['einstieg_oben']:.2f}"
+        f"${x['einstieg']:.2f}"
     )
 
     print(
         f"Stop-Loss:        "
-        f"${ergebnis['stop_loss']:.2f}"
+        f"${x['stop_loss']:.2f}"
     )
 
     print(
-        f"Ziel 1:            "
-        f"${ergebnis['ziel1']:.2f}"
+        f"Take Profit 1:    "
+        f"${x['ziel1']:.2f}"
     )
 
     print(
-        f"Ziel 2:            "
-        f"${ergebnis['ziel2']:.2f}"
+        f"Take Profit 2:    "
+        f"${x['ziel2']:.2f}"
     )
 
-    if ergebnis["gruende"]:
+    if x["gruende"]:
 
         print()
 
         print("GRÜNDE:")
 
-        for grund in ergebnis["gruende"]:
+        for grund in x["gruende"]:
 
             print(
                 f"  • {grund}"
@@ -847,29 +755,34 @@ def zeige(ergebnis, nummer):
 
 
 # ============================================================
-# HAUPTSCANNER
+# HAUPTPROGRAMM
 # ============================================================
 
 def main():
 
     print()
-    print("=" * 65)
-    print("             AKTIEN KI SCANNER V5")
-    print("=" * 65)
+    print("=" * 70)
+    print("             AKTIEN TRADING SCANNER V6")
+    print("=" * 70)
+
+    print()
 
     print(
-        f"Start: "
+        f"Scan gestartet: "
         f"{datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
     )
 
     print(
-        f"Aktien im Scan: "
-        f"{len(WERTPAPIERE)}"
+        f"Aktien im Scan: {len(AKTIEN)}"
     )
 
     ergebnisse = []
 
-    for ticker in WERTPAPIERE:
+    # ========================================================
+    # SCANNEN
+    # ========================================================
+
+    for ticker in AKTIEN:
 
         print(
             f"Scanne {ticker}...",
@@ -887,85 +800,92 @@ def main():
         )
 
         if ergebnis:
+
             ergebnisse.append(
                 ergebnis
             )
 
-    # --------------------------------------------------------
+    # ========================================================
     # SORTIEREN
-    # --------------------------------------------------------
+    # ========================================================
 
     ergebnisse.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
-    # --------------------------------------------------------
-    # ERGEBNIS
-    # --------------------------------------------------------
+    # ========================================================
+    # TOP 10
+    # ========================================================
 
     print()
     print()
-    print("=" * 65)
-    print("                    TOP SIGNALS")
-    print("=" * 65)
+    print("=" * 70)
+    print("              🏆 TOP 10 TRADING")
+    print("=" * 70)
 
-    for nummer, ergebnis in enumerate(
-        ergebnisse[:15],
+    for nummer, x in enumerate(
+        ergebnisse[:TOP_AKTIEN],
         start=1
     ):
 
-        zeige(
-            ergebnis,
+        ausgabe(
+            x,
             nummer
         )
 
     # ========================================================
-    # LONG LISTE
+    # LONG
     # ========================================================
 
     long_liste = [
         x for x in ergebnisse
-        if x["signal"] == "🟢 LONG"
+        if x["signal"] in [
+            "🟢 LONG",
+            "🟢 STARKER LONG"
+        ]
     ]
 
     print()
     print()
-    print("=" * 65)
-    print("                    🟢 LONG")
-    print("=" * 65)
+    print("=" * 70)
+    print("                  🟢 LONG")
+    print("=" * 70)
 
     for x in long_liste[:10]:
 
         print(
             f"{x['ticker']:6} | "
             f"WKN {x['wkn']:8} | "
-            f"Score {x['score']:3}/100 | "
-            f"Momentum {x['momentum20']:+.2f}%"
+            f"{x['signal']:20} | "
+            f"{x['score']:3}/100"
         )
 
     # ========================================================
-    # SHORT LISTE
+    # SHORT
     # ========================================================
 
     short_liste = [
         x for x in ergebnisse
-        if x["signal"] == "🔴 SHORT"
+        if x["signal"] in [
+            "🔴 SHORT",
+            "🔴 STARKER SHORT"
+        ]
     ]
 
     print()
     print()
-    print("=" * 65)
-    print("                    🔴 SHORT")
-    print("=" * 65)
+    print("=" * 70)
+    print("                  🔴 SHORT")
+    print("=" * 70)
 
     for x in short_liste[:10]:
 
         print(
             f"{x['ticker']:6} | "
             f"WKN {x['wkn']:8} | "
-            f"Score {x['score']:3}/100 | "
-            f"Momentum {x['momentum20']:+.2f}%"
+            f"{x['signal']:20} | "
+            f"{x['score']:3}/100"
         )
 
     # ========================================================
@@ -979,9 +899,9 @@ def main():
 
     print()
     print()
-    print("=" * 65)
-    print("                 🟡 TAKE PROFIT")
-    print("=" * 65)
+    print("=" * 70)
+    print("                🟡 TAKE PROFIT")
+    print("=" * 70)
 
     for x in tp_liste[:10]:
 
@@ -989,19 +909,33 @@ def main():
             f"{x['ticker']:6} | "
             f"WKN {x['wkn']:8} | "
             f"Score {x['score']:3}/100 | "
-            f"Abstand Hoch {x['abstand_hoch']:.2f}%"
+            f"Hoch-Abstand "
+            f"{x['abstand_hoch']:.2f}%"
         )
+
+    # ========================================================
+    # ABSCHLUSS
+    # ========================================================
 
     print()
     print()
-    print("=" * 65)
-    print("Scanner abgeschlossen.")
-    print("=" * 65)
+    print("=" * 70)
+
+    print(
+        f"Analysierte Aktien: "
+        f"{len(ergebnisse)}"
+    )
+
+    print(
+        "Scanner abgeschlossen."
+    )
+
+    print("=" * 70)
 
     print()
     print(
-        "⚠️ Technische Analyse – "
-        "keine Garantie für Gewinne."
+        "⚠️ Technische Analyse ist keine "
+        "Garantie für Gewinne."
     )
 
 
