@@ -4,10 +4,12 @@ import numpy as np
 import time
 
 # ============================================================
-# AKTIEN KI SCANNER V3
-# Ziel:
-# Aktien mit starken Bewegungen finden und unterscheiden:
-# LONG / TAKE-PROFIT / ABWÄRTS / BEOBACHTEN
+# AKTIEN KI SCANNER V4
+# Swing-Trading / Volatilität / Momentum
+#
+# Hinweis:
+# Die Signale sind technische Analyse und keine Garantie
+# für Gewinne.
 # ============================================================
 
 AKTIEN = [
@@ -18,6 +20,60 @@ AKTIEN = [
     "BA", "UBER", "SHOP", "ORCL", "CRM",
     "ADBE", "QCOM", "INTC", "ARM", "HOOD"
 ]
+
+# ============================================================
+# WKN / ISIN
+#
+# Nur Zuordnungen verwenden, die zum konkreten Wertpapier
+# passen. Nicht hinterlegte Werte werden nicht geraten.
+# ============================================================
+
+WERTPAPIERE = {
+    "NVDA": {
+        "wkn": "918422",
+        "isin": "US67066G1040"
+    },
+    "TSLA": {
+        "wkn": "A1CX3T",
+        "isin": "US88160R1014"
+    },
+    "AMD": {
+        "wkn": "863186",
+        "isin": "US0079031078"
+    },
+    "MSTR": {
+        "wkn": "A0J3ER",
+        "isin": "US5949724083"
+    },
+    "AAPL": {
+        "wkn": "865985",
+        "isin": "US0378331005"
+    },
+    "MSFT": {
+        "wkn": "870747",
+        "isin": "US5949181045"
+    },
+    "AMZN": {
+        "wkn": "906866",
+        "isin": "US0231351067"
+    },
+    "GOOGL": {
+        "wkn": "A14Y6F",
+        "isin": "US02079K3059"
+    },
+    "META": {
+        "wkn": "A1JWVX",
+        "isin": "US30303M1027"
+    },
+    "JPM": {
+        "wkn": "850628",
+        "isin": "US46647P1049"
+    },
+    "CRM": {
+        "wkn": "A3DB79",
+        "isin": "CA79467F1062"
+    }
+}
 
 
 def hole_daten(symbol):
@@ -43,11 +99,16 @@ def hole_daten(symbol):
         kurs = float(close.iloc[-1])
 
         # ====================================================
-        # GLEITENDE DURCHSCHNITTE
+        # DURCHSCHNITTE
         # ====================================================
 
-        sma20 = float(close.rolling(20).mean().iloc[-1])
-        sma50 = float(close.rolling(50).mean().iloc[-1])
+        sma20 = float(
+            close.rolling(20).mean().iloc[-1]
+        )
+
+        sma50 = float(
+            close.rolling(50).mean().iloc[-1]
+        )
 
         # ====================================================
         # ATR 14
@@ -64,12 +125,12 @@ def hole_daten(symbol):
             axis=1
         ).max(axis=1)
 
-        atr14 = float(
+        atr = float(
             true_range.rolling(14).mean().iloc[-1]
         )
 
         atr_prozent = (
-            atr14 / kurs * 100
+            atr / kurs * 100
         )
 
         # ====================================================
@@ -77,15 +138,15 @@ def hole_daten(symbol):
         # ====================================================
 
         momentum5 = (
-            (kurs / float(close.iloc[-6])) - 1
+            kurs / float(close.iloc[-6]) - 1
         ) * 100
 
         momentum20 = (
-            (kurs / float(close.iloc[-21])) - 1
+            kurs / float(close.iloc[-21]) - 1
         ) * 100
 
         momentum60 = (
-            (kurs / float(close.iloc[-61])) - 1
+            kurs / float(close.iloc[-61]) - 1
         ) * 100
 
         # ====================================================
@@ -113,32 +174,25 @@ def hole_daten(symbol):
         )
 
         abstand_hoch = (
-            (hoch20 - kurs)
-            / kurs
-            * 100
-        )
-
-        abstand_tief = (
-            (kurs - tief20)
-            / kurs
-            * 100
+            (hoch20 - kurs) / kurs * 100
         )
 
         # ====================================================
         # VOLUMEN
         # ====================================================
 
-        volumen20 = float(
+        durchschnitt_volumen = float(
             volume.tail(20).mean()
         )
 
-        volumen_aktuell = float(
+        aktuelles_volumen = float(
             volume.iloc[-1]
         )
 
         volumen_faktor = (
-            volumen_aktuell / volumen20
-            if volumen20 > 0
+            aktuelles_volumen
+            / durchschnitt_volumen
+            if durchschnitt_volumen > 0
             else 0
         )
 
@@ -146,175 +200,160 @@ def hole_daten(symbol):
         # TREND
         # ====================================================
 
-        trend_aufwaerts = (
-            kurs > sma20 and
-            sma20 > sma50
+        aufwaertstrend = (
+            kurs > sma20
+            and sma20 > sma50
         )
 
-        trend_abwaerts = (
-            kurs < sma20 and
-            sma20 < sma50
+        abwaertstrend = (
+            kurs < sma20
+            and sma20 < sma50
         )
 
         # ====================================================
-        # SCORE
+        # LONG SCORE
         # ====================================================
 
         long_score = 0
-        short_score = 0
+        long_gruende = []
 
-        gruende_long = []
-        gruende_short = []
-
-        # ----------------------------------------------------
-        # LONG
-        # ----------------------------------------------------
-
-        if trend_aufwaerts:
+        if aufwaertstrend:
             long_score += 25
-            gruende_long.append(
+            long_gruende.append(
                 "Aufwärtstrend über SMA20/SMA50"
             )
 
         if momentum20 >= 15:
             long_score += 25
-            gruende_long.append(
-                "starkes 20-Tage-Momentum"
+            long_gruende.append(
+                "starkes Momentum"
             )
-
         elif momentum20 >= 5:
             long_score += 15
-            gruende_long.append(
-                "positives 20-Tage-Momentum"
+            long_gruende.append(
+                "positives Momentum"
             )
 
         if volumen_faktor >= 1.5:
             long_score += 20
-            gruende_long.append(
+            long_gruende.append(
                 "stark erhöhtes Volumen"
             )
-
         elif volumen_faktor >= 1.1:
             long_score += 10
-            gruende_long.append(
+            long_gruende.append(
                 "überdurchschnittliches Volumen"
             )
 
         if atr_prozent >= 3:
             long_score += 15
-            gruende_long.append(
-                "hohe handelbare Schwankung"
+            long_gruende.append(
+                "hohe Schwankungsbreite"
             )
-
         elif atr_prozent >= 2:
             long_score += 8
 
-        # ----------------------------------------------------
-        # SHORT / ABWÄRTS
-        # ----------------------------------------------------
+        # ====================================================
+        # ABWÄRTS SCORE
+        # ====================================================
 
-        if trend_abwaerts:
+        short_score = 0
+        short_gruende = []
+
+        if abwaertstrend:
             short_score += 25
-            gruende_short.append(
+            short_gruende.append(
                 "Abwärtstrend unter SMA20/SMA50"
             )
 
         if momentum20 <= -15:
             short_score += 25
-            gruende_short.append(
-                "stark negatives 20-Tage-Momentum"
+            short_gruende.append(
+                "stark negatives Momentum"
             )
-
         elif momentum20 <= -5:
             short_score += 15
-            gruende_short.append(
-                "negatives 20-Tage-Momentum"
+            short_gruende.append(
+                "negatives Momentum"
             )
 
         if volumen_faktor >= 1.5:
             short_score += 20
-            gruende_short.append(
+            short_gruende.append(
                 "stark erhöhtes Volumen"
             )
 
-        elif volumen_faktor >= 1.1:
-            short_score += 10
-
         if atr_prozent >= 3:
             short_score += 15
-            gruende_short.append(
-                "hohe handelbare Schwankung"
+            short_gruende.append(
+                "hohe Schwankungsbreite"
             )
 
         # ====================================================
-        # TAKE-PROFIT
+        # TAKE-PROFIT SCORE
         # ====================================================
 
-        take_profit_score = 0
-        gruende_tp = []
+        tp_score = 0
+        tp_gruende = []
 
-        if trend_aufwaerts:
-            take_profit_score += 20
-            gruende_tp.append(
+        if aufwaertstrend:
+            tp_score += 20
+            tp_gruende.append(
                 "Aufwärtstrend"
             )
 
         if momentum20 >= 15:
-            take_profit_score += 25
-            gruende_tp.append(
+            tp_score += 25
+            tp_gruende.append(
                 "starke Kursbewegung"
             )
 
         if abstand_hoch <= 3:
-            take_profit_score += 30
-            gruende_tp.append(
+            tp_score += 30
+            tp_gruende.append(
                 "sehr nahe am 20-Tage-Hoch"
             )
-
         elif abstand_hoch <= 5:
-            take_profit_score += 20
-            gruende_tp.append(
+            tp_score += 20
+            tp_gruende.append(
                 "nahe am 20-Tage-Hoch"
             )
 
         if volatilitaet20 >= 40:
-            take_profit_score += 15
-            gruende_tp.append(
+            tp_score += 15
+            tp_gruende.append(
                 "hohe kurzfristige Volatilität"
             )
 
         if volumen_faktor >= 1.5:
-            take_profit_score += 10
-            gruende_tp.append(
+            tp_score += 10
+            tp_gruende.append(
                 "erhöhtes Volumen"
             )
 
-        take_profit_score = min(
-            take_profit_score,
-            100
-        )
+        tp_score = min(tp_score, 100)
 
         # ====================================================
-        # BESTES SIGNAL
+        # SIGNAL
         # ====================================================
 
-        if take_profit_score >= 70:
+        if tp_score >= 70:
 
             signal = "🟡 TAKE-PROFIT-KANDIDAT"
-            score = take_profit_score
-            gruende = gruende_tp
+            score = tp_score
+            gruende = tp_gruende
 
         elif long_score >= 65:
 
             signal = "🟢 LONG-KANDIDAT"
             score = long_score
-            gruende = gruende_long
+            gruende = long_gruende
 
         elif short_score >= 65:
 
             signal = "🔴 ABWÄRTS-KANDIDAT"
             score = short_score
-            gruende = gruende_short
+            gruende = short_gruende
 
         else:
 
@@ -322,48 +361,131 @@ def hole_daten(symbol):
             score = max(
                 long_score,
                 short_score,
-                take_profit_score
+                tp_score
             )
             gruende = []
 
         # ====================================================
-        # ATR ORIENTIERUNG
+        # SWING-ZONEN
+        # ====================================================
+        #
+        # Diese Werte sind technische Orientierungen.
+        # Keine garantierten Ziele.
+        #
+
+        if signal == "🟢 LONG-KANDIDAT":
+
+            einstieg_unten = kurs - atr * 0.50
+            einstieg_oben = kurs + atr * 0.10
+
+            stop_loss = (
+                einstieg_unten - atr * 0.75
+            )
+
+            take_profit1 = (
+                kurs + atr * 1.0
+            )
+
+            take_profit2 = (
+                kurs + atr * 2.0
+            )
+
+        elif signal == "🔴 ABWÄRTS-KANDIDAT":
+
+            einstieg_unten = kurs - atr * 0.10
+            einstieg_oben = kurs + atr * 0.50
+
+            stop_loss = (
+                einstieg_oben + atr * 0.75
+            )
+
+            take_profit1 = (
+                kurs - atr * 1.0
+            )
+
+            take_profit2 = (
+                kurs - atr * 2.0
+            )
+
+        else:
+
+            einstieg_unten = kurs - atr * 0.50
+            einstieg_oben = kurs + atr * 0.50
+
+            stop_loss = kurs - atr
+
+            take_profit1 = kurs + atr
+
+            take_profit2 = kurs + atr * 2
+
+        # ====================================================
+        # WKN / ISIN
         # ====================================================
 
-        atr_oben = kurs + atr14
-        atr_unten = kurs - atr14
+        wertpapier = WERTPAPIERE.get(
+            symbol,
+            {}
+        )
+
+        wkn = wertpapier.get(
+            "wkn",
+            "nicht hinterlegt"
+        )
+
+        isin = wertpapier.get(
+            "isin",
+            "nicht hinterlegt"
+        )
 
         return {
 
             "symbol": symbol,
+            "wkn": wkn,
+            "isin": isin,
+
             "kurs": kurs,
 
             "score": score,
             "signal": signal,
 
-            "sma20": sma20,
-            "sma50": sma50,
-
-            "atr": atr14,
+            "atr": atr,
             "atr_prozent": atr_prozent,
 
-            "volatilitaet20": volatilitaet20,
+            "volatilitaet20":
+                volatilitaet20,
 
-            "momentum5": momentum5,
-            "momentum20": momentum20,
-            "momentum60": momentum60,
+            "momentum5":
+                momentum5,
 
-            "hoch20": hoch20,
-            "tief20": tief20,
+            "momentum20":
+                momentum20,
 
-            "abstand_hoch": abstand_hoch,
+            "momentum60":
+                momentum60,
 
-            "volumen_faktor": volumen_faktor,
+            "abstand_hoch":
+                abstand_hoch,
 
-            "atr_oben": atr_oben,
-            "atr_unten": atr_unten,
+            "volumen_faktor":
+                volumen_faktor,
 
-            "gruende": gruende
+            "einstieg_unten":
+                einstieg_unten,
+
+            "einstieg_oben":
+                einstieg_oben,
+
+            "stop_loss":
+                stop_loss,
+
+            "take_profit1":
+                take_profit1,
+
+            "take_profit2":
+                take_profit2,
+
+            "gruende":
+                gruende
         }
 
     except Exception as e:
@@ -379,8 +501,8 @@ def scanner():
 
     print()
     print("=" * 75)
-    print("       AKTIEN KI SCANNER V3")
-    print("       SWING / VOLATILITÄT / SIGNAL")
+    print("             AKTIEN KI SCANNER V4")
+    print("          SWING / VOLATILITÄT / SIGNAL")
     print("=" * 75)
     print()
 
@@ -399,22 +521,15 @@ def scanner():
 
         time.sleep(0.5)
 
-    # ========================================================
-    # SORTIEREN
-    # ========================================================
-
+    # Nach Score sortieren
     ergebnisse.sort(
         key=lambda x: x["score"],
         reverse=True
     )
 
-    # ========================================================
-    # AUSGABE
-    # ========================================================
-
     print()
     print("=" * 75)
-    print("             TOP SWING-SIGNALE")
+    print("                    TOP SIGNALS")
     print("=" * 75)
 
     for platz, daten in enumerate(
@@ -428,13 +543,18 @@ def scanner():
         )
 
         print(
-            f"Kurs:              "
-            f"${daten['kurs']:.2f}"
+            f"WKN:               "
+            f"{daten['wkn']}"
         )
 
         print(
-            f"Score:             "
-            f"{daten['score']}/100"
+            f"ISIN:              "
+            f"{daten['isin']}"
+        )
+
+        print(
+            f"Kurs:              "
+            f"${daten['kurs']:.2f}"
         )
 
         print(
@@ -443,12 +563,17 @@ def scanner():
         )
 
         print(
-            f"ATR 14:            "
-            f"${daten['atr']:.2f}"
+            f"Score:             "
+            f"{daten['score']}/100"
         )
 
         print(
             f"ATR:               "
+            f"${daten['atr']:.2f}"
+        )
+
+        print(
+            f"ATR %:             "
             f"{daten['atr_prozent']:.2f}%"
         )
 
@@ -473,27 +598,43 @@ def scanner():
         )
 
         print(
-            f"Abstand Hoch:      "
-            f"{daten['abstand_hoch']:.2f}%"
-        )
-
-        print(
             f"Volumen Faktor:    "
             f"{daten['volumen_faktor']:.2f}x"
         )
 
         print(
-            f"ATR oben:          "
-            f"${daten['atr_oben']:.2f}"
+            f"Abstand Hoch:      "
+            f"{daten['abstand_hoch']:.2f}%"
+        )
+
+        print()
+        print("TECHNISCHE ZONEN")
+
+        print(
+            f"Einstiegszone:     "
+            f"${daten['einstieg_unten']:.2f}"
+            f" - "
+            f"${daten['einstieg_oben']:.2f}"
         )
 
         print(
-            f"ATR unten:         "
-            f"${daten['atr_unten']:.2f}"
+            f"Stop-Loss-Zone:    "
+            f"${daten['stop_loss']:.2f}"
+        )
+
+        print(
+            f"Take Profit 1:     "
+            f"${daten['take_profit1']:.2f}"
+        )
+
+        print(
+            f"Take Profit 2:     "
+            f"${daten['take_profit2']:.2f}"
         )
 
         if daten["gruende"]:
 
+            print()
             print("Gründe:")
 
             for grund in daten["gruende"]:
@@ -508,9 +649,11 @@ def scanner():
     print("=" * 75)
     print()
     print(
-        "Hinweis: Die Signale sind "
-        "technische Analyse und keine "
-        "Garantie für Gewinne."
+        "Hinweis: Einstiegs-, Stop- und "
+        "Take-Profit-Werte sind technische "
+        "Orientierungen und keine "
+        "Handelsempfehlungen oder "
+        "Gewinngarantien."
     )
 
 
