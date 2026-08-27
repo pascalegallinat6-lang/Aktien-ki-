@@ -1,0 +1,27 @@
+name: Aktien Ki Scanner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 18 * * 1-5"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code herunterladen
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhängigkeiten installieren
+        run: |
+          pip install -r requirements.txt
+
+      - name: Aktien Scanner starten
+        run: |
+          python main.py
